@@ -1,0 +1,255 @@
+/*----------------------------------------------------------------------------
+
+Implementation of:
+Destexhe, Alain, "Spike-and-Wave Oscillations Based on the Properties of GABAB Receptors"
+The Journal of Neuroscience, November 1, 1998, 18(21):9099–9111
+
+Created by modifying the file file Fspin.oc in Thalamocortical and Thalamic Reticular Network (Destexhe et al 1996, ModelDB Acession:3343) to create the four layer network described in the paper listed above, with various other functions added.
+
+Andrew Knox 2014
+
+
+----------------------------------------------------------------------------*/
+
+nthalamiccells = 10
+
+trans = 10000*0
+Dt = 0.1
+dt = 0.1			// must be submultiple of Dt
+npoints = 30000+100000*0
+
+watchneuron = 50*0
+
+
+//----------------------------------------------------------------------------
+//  load and define general graphical procedures
+//----------------------------------------------------------------------------
+
+load_file("nrngui.hoc")
+
+objectvar g[20]			// max 20 graphs
+objectvar g1, g2, g3, g4
+ngraph = 0
+
+proc addgraph() { local ii	// define subroutine to add a new graph
+				// addgraph("variable", minvalue, maxvalue)
+	ngraph = ngraph+1
+	ii = ngraph-1
+	g[ii] = new Graph(0)
+	g[ii].view(0,1,0,1, int(ii/2)*550+80, ii%2*450+100, 400, 300)
+	g[ii].size(tstart,tstop,$2,$3)
+	g[ii].xaxis()
+	g[ii].yaxis()
+	g[ii].addvar($s1,1,0)
+	g[ii].save_name("graphList[0].")
+	graphList[0].append(g[ii])
+}
+
+proc addfieldgraph() { local ii	// hack solution for a better positioned graph of electrical field
+	ngraph = ngraph+1
+	ii = ngraph-1
+	g[ii] = new Graph(0)
+	g[ii].view(0,1,0,1, 650, 0, 800, 300)
+	g[ii].size(tstart,tstop,$2,$3)
+	g[ii].xaxis()
+	g[ii].yaxis()
+	g[ii].addvar($s1,1,0)
+	g[ii].save_name("graphList[0].")
+	graphList[0].append(g[ii])
+}
+
+proc addtext() { local ii	// define subroutine to add a text graph
+				// addtext("text")
+	ngraph = ngraph+1
+	ii = ngraph-1
+	g[ii] = new Graph()
+	g[ii].size(0,tstop,0,1)
+	g[ii].xaxis(3)
+	g[ii].yaxis(3)
+	g[ii].label(0.1,0.5,$s1)
+	g[ii].save_name("graphList[0].")
+	graphList[0].append(g[ii])
+	text_id = ii
+}
+
+proc addline() {		// to add a comment to the text window
+
+				// addline("text")
+	g[text_id].label($s1)
+}
+
+if(ismenu==0) {
+  nrnmainmenu()			// create main menu
+  nrncontrolmenu()		// create control menu
+  ismenu=1
+}
+
+
+objref membranedatafile
+membranedatafile = new File()
+
+
+
+//----------------------------------------------------------------------------
+// global simulation variables
+//----------------------------------------------------------------------------
+
+
+
+objectvar RE[nthalamiccells]		// create TC cells
+objectvar REVtrace[nthalamiccells]
+
+//stuff for raster plot
+objref tobj, nil
+
+objref REtimevec, REidvec, recncs, recveclist
+
+recncs = new List()
+recveclist = new List()
+
+field = 0
+
+//----------------------------------------------------------------------------
+//  setup simulation parameters
+//----------------------------------------------------------------------------
+
+
+objectvar Sim			// create vector of simulation points
+Sim = new Vector(npoints)
+
+tstart = trans
+tstop = trans + npoints * Dt
+runStopAt = tstop
+steps_per_ms = 1/Dt
+celsius = 36.0
+v_init = -70.0
+
+
+proc init () {
+  finitialize(v_init)
+
+   fcurrent()
+  cvode.re_init()
+  frecord_init()
+
+  printREinfo(0)  
+
+}
+
+
+
+
+//----------------------------------------------------------------------------
+//  Create Cells
+//----------------------------------------------------------------------------
+
+print " "
+print "<<==================================>>"
+print "<<            CREATE CELLS          >>"
+print "<<==================================>>"
+print " "
+
+load_file("RE.tem")		// read geometry file
+for i=0,nthalamiccells-1 {
+  RE[i] = new sRE()
+}
+
+
+//----------------------------------------------------------------------------
+// set up recording stuff
+//----------------------------------------------------------------------------
+
+    REtimevec = new Vector()
+    REidvec = new Vector()
+
+
+for i=0,nthalamiccells-1 {
+    REVtrace[i] = new Vector()
+    REVtrace[i].record(&RE[i].soma.v(0.5))
+    RE[i].soma tobj = new NetCon(&v(0.5), nil)
+    tobj.record(REtimevec, REidvec, i+1) // so all the spike rasters lie above the x axis
+    recncs.append(tobj)
+}
+
+
+
+//----------------------------------------------------------------------------
+//  add graphs
+//----------------------------------------------------------------------------
+
+
+strdef gtxt
+//for i=0,ncells-1 {
+//for i=50,51 {
+i=watchneuron
+	sprint(gtxt,"TC[%d].soma.v(0.5)",i)
+	addgraph(gtxt,-120,40)
+	sprint(gtxt,"RE[%d].soma.v(0.5)",i)
+	addgraph(gtxt,-120,40)
+    sprint(gtxt,"PY[%d].soma.v(0.5)",i)
+	addgraph(gtxt,-120,40)
+	sprint(gtxt,"IN[%d].soma.v(0.5)",i)
+	addgraph(gtxt,-120,40)
+//}
+
+
+//-----------------------------------------------------------------------------
+// Make raster plots
+//-----------------------------------------------------------------------------
+
+
+proc rasterplot() {
+  print "plot:", tstart, tstop
+  //PYtimevec.printf()
+  //PYidvec.printf()
+  plotlen = tstop // 3000 
+  
+  g3 = new Graph(0)
+  g3.label(0.5, 0.95,"RE")
+  g3.view(tstart,0,plotlen,100,650,500,400,300)
+  REidvec.mark(g3, REtimevec,"o",2)
+  
+}
+
+
+proc advance() {
+   fadvance()
+}
+
+
+print " "
+print "Use procedure text() to create a new window with actual parameters"
+print "Use procedure assign_synapses() to change synaptic conductances"
+print " "
+
+
+proc printREinfo(){
+	index=$1
+	print " "
+	print "---------- RE Parameter values (index=",index,") --------------"
+	print " "
+
+	print "diam=",RE[index].soma.diam,"\t L=",RE[index].soma.L," \t Cm=",RE[index].soma.cm," \t Ra=",RE[index].soma.Ra
+	print "g_pas=",RE[index].soma.g_pas," \t e_pas=",RE[index].soma.e_pas," \t vinit=", RE[index].soma.v(0.5)
+	print "gnabar_hh2=",RE[index].soma.gnabar_hh2," \t ena=", RE[index].soma.ena
+	print "gkbar_hh2=",RE[index].soma.gkbar_hh2," \t ek=",RE[index].soma.ek," \t vtraub_hh2=", RE[index].soma.vtraub_hh2
+	print "gcabar_it2=",RE[index].soma.gcabar_it2," \t eca=",RE[index].soma.eca," \t cai=", RE[index].soma.cai," \t cao=", RE[index].soma.cao
+	print "shift_it2=",RE[index].soma.shift_it2," \t taubase_it2=",RE[index].soma.taubase_it2," \t qm_it2=", RE[index].soma.qm_it2," \t qh_it2=", RE[index].soma.qh_it2
+	print "depth_cad=",RE[index].soma.depth_cad," \t taur_cad=",RE[index].soma.taur_cad," \t cainf_cad=", RE[index].soma.cainf_cad," \t kt_cad=", RE[index].soma.kt_cad
+
+	print " "
+	print "----------------- RE Parameter values (end) --------------------"
+	print " "
+}
+
+proc myrun() {
+
+	run()
+	rasterplot()
+}
+
+myrun()
+
+print " "
+print "App end"
+print " "
