@@ -18,9 +18,9 @@ from neuronpy.util import spiketrain
 
 def printREinfo(indx):
     index=indx
-    print " "
-    print "------ RE Parameter values (index=",index,") ---------"
-    print " "
+    print (" ")
+    print ("------ RE Parameter values (index=",index,") ---------")
+    print (" ")
     
     print "diam=",RE[index].soma.diam,"\t L=",RE[index].soma.L," \t Cm=",RE[index].soma.cm," \t Ra=",RE[index].soma.Ra
     print "g_pas=",RE[index].soma.g_pas," \t e_pas=",RE[index].soma.e_pas," \t vinit=", RE[index].soma(0.5).v
